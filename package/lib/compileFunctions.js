@@ -57,12 +57,12 @@ module.exports = {
         'projects',
         _.get(this, 'serverless.service.provider.project'),
         'locations',
-        location
+        location // eslint-disable-line comma-dangle
       ].join('/');
 
       if (_.get(funcObject, 'serviceAccount') || _.get(this, 'serverless.service.provider.serviceAccount')) {
-        funcTemplate.properties.serviceAccountEmail = _.get(funcObject, 'serviceAccount') 
-        || _.get(this, 'serverless.service.provider.serviceAccount')
+        funcTemplate.properties.serviceAccountEmail = _.get(funcObject, 'serviceAccount')
+        || _.get(this, 'serverless.service.provider.serviceAccount');
       }
 
       if (!_.size(funcTemplate.properties.environmentVariables)) {
