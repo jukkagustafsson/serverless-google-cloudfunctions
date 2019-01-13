@@ -37,7 +37,11 @@ module.exports = {
     };
 
     _.forEach(resources.resources, (resource) => {
-      if (resource.type === 'cloudfunctions.v1beta2.function') {
+      const resourceTypes = [
+        'gcp-types/cloudfunctions-v1:projects.locations.functions',
+        'cloudfunctions.v1beta2.function',
+      ];
+      if (resourceTypes.includes(resource.type)) {
         const serviceFuncName = getFunctionNameInService(
           resource.name, this.serverless.service.service, this.options.stage);
         const serviceFunc = this.serverless.service.getFunction(serviceFuncName);

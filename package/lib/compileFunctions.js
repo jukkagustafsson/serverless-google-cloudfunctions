@@ -21,12 +21,15 @@ module.exports = {
       this.serverless.cli
         .log(`Compiling function "${functionName}"...`);
 
+      if (!_.get(this, 'serverless.service.provider.project')) {
+        throw new Error('Missing "project" property for service provider.');
+      }
+
       validateHandlerProperty(funcObject, functionName);
       validateEventsProperty(funcObject, functionName);
 
       const funcTemplate = getFunctionTemplate(
         funcObject,
-        this.serverless.service.provider.region,
         `gs://${
         this.serverless.service.provider.deploymentBucketName
         }/${this.serverless.service.package.artifactFilePath}`);
@@ -34,9 +37,6 @@ module.exports = {
       funcTemplate.properties.availableMemoryMb = _.get(funcObject, 'memorySize')
         || _.get(this, 'serverless.service.provider.memorySize')
         || 256;
-      funcTemplate.properties.location = _.get(funcObject, 'location')
-        || _.get(this, 'serverless.service.provider.region')
-        || 'us-central1';
       funcTemplate.properties.runtime = _.get(funcObject, 'runtime')
         || _.get(this, 'serverless.service.provider.runtime')
         || 'nodejs8';
@@ -47,6 +47,23 @@ module.exports = {
         _.get(this, 'serverless.service.provider.environment'),
         funcObject.environment // eslint-disable-line comma-dangle
       );
+
+      const location = _.get(funcObject, 'location')
+      || _.get(this, 'serverless.service.provider.region')
+      || 'us-central1';
+
+
+      funcTemplate.properties.parent = [
+        'projects',
+        _.get(this, 'serverless.service.provider.project'),
+        'locations',
+        location // eslint-disable-line comma-dangle
+      ].join('/');
+
+      if (_.get(funcObject, 'serviceAccount') || _.get(this, 'serverless.service.provider.serviceAccount')) {
+        funcTemplate.properties.serviceAccountEmail = _.get(funcObject, 'serviceAccount')
+        || _.get(this, 'serverless.service.provider.serviceAccount');
+      }
 
       if (!_.size(funcTemplate.properties.environmentVariables)) {
         delete funcTemplate.properties.environmentVariables;
@@ -124,12 +141,11 @@ const validateEventsProperty = (funcObject, functionName) => {
   }
 };
 
-const getFunctionTemplate = (funcObject, region, sourceArchiveUrl) => { //eslint-disable-line
+const getFunctionTemplate = (funcObject, sourceArchiveUrl) => { //eslint-disable-line
   return {
-    type: 'cloudfunctions.v1beta2.function',
+    type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
     name: funcObject.name,
     properties: {
-      location: region,
       availableMemoryMb: 256,
       runtime: 'nodejs8',
       timeout: '60s',
