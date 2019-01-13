@@ -23,6 +23,7 @@ describe('CompileFunctions', () => {
         resources: [],
       },
       deploymentBucketName: 'sls-my-service-dev-12345678',
+      project: 'my-project' // eslint-disable-line comma-dangle
     };
     serverless.setProvider('google', new GoogleProvider(serverless));
     const options = {
@@ -44,6 +45,12 @@ describe('CompileFunctions', () => {
           handler: null,
         },
       };
+
+      expect(() => googlePackage.compileFunctions()).toThrow(Error);
+    });
+
+    it('should throw an error if the project property is not set', () => {
+      googlePackage.serverless.service.provider.project = null;
 
       expect(() => googlePackage.compileFunctions()).toThrow(Error);
     });
@@ -110,10 +117,10 @@ describe('CompileFunctions', () => {
       };
 
       const compiledResources = [{
-        type: 'cloudfunctions.v1beta2.function',
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
         name: 'my-service-dev-func1',
         properties: {
-          location: 'us-central1',
+          parent: 'projects/my-project/locations/us-central1',
           runtime: 'nodejs8',
           function: 'func1',
           availableMemoryMb: 1024,
@@ -145,10 +152,10 @@ describe('CompileFunctions', () => {
       googlePackage.serverless.service.provider.memorySize = 1024;
 
       const compiledResources = [{
-        type: 'cloudfunctions.v1beta2.function',
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
         name: 'my-service-dev-func1',
         properties: {
-          location: 'us-central1',
+          parent: 'projects/my-project/locations/us-central1',
           runtime: 'nodejs8',
           function: 'func1',
           availableMemoryMb: 1024,
@@ -180,10 +187,10 @@ describe('CompileFunctions', () => {
       };
 
       const compiledResources = [{
-        type: 'cloudfunctions.v1beta2.function',
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
         name: 'my-service-dev-func1',
         properties: {
-          location: 'us-central1',
+          parent: 'projects/my-project/locations/us-central1',
           runtime: 'nodejs8',
           function: 'func1',
           availableMemoryMb: 256,
@@ -215,15 +222,51 @@ describe('CompileFunctions', () => {
       googlePackage.serverless.service.provider.timeout = '120s';
 
       const compiledResources = [{
-        type: 'cloudfunctions.v1beta2.function',
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
         name: 'my-service-dev-func1',
         properties: {
-          location: 'us-central1',
+          parent: 'projects/my-project/locations/us-central1',
           runtime: 'nodejs8',
           function: 'func1',
           availableMemoryMb: 256,
           timeout: '120s',
           sourceArchiveUrl: 'gs://sls-my-service-dev-12345678/some-path/artifact.zip',
+          httpsTrigger: {
+            url: 'foo',
+          },
+          labels: {},
+        },
+      }];
+
+      return googlePackage.compileFunctions().then(() => {
+        expect(consoleLogStub.calledOnce).toEqual(true);
+        expect(googlePackage.serverless.service.provider.compiledConfigurationTemplate.resources)
+          .toEqual(compiledResources);
+      });
+    });
+
+    it('should set the service-account based on the provider configuration', () => {
+      googlePackage.serverless.service.functions = {
+        func1: {
+          handler: 'func1',
+          events: [
+            { http: 'foo' },
+          ],
+        },
+      };
+      googlePackage.serverless.service.provider.serviceAccount = 'my-service-account@my-project.iam.gserviceaccount.com';
+
+      const compiledResources = [{
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
+        name: 'my-service-dev-func1',
+        properties: {
+          parent: 'projects/my-project/locations/us-central1',
+          runtime: 'nodejs8',
+          function: 'func1',
+          availableMemoryMb: 256,
+          timeout: '60s',
+          sourceArchiveUrl: 'gs://sls-my-service-dev-12345678/some-path/artifact.zip',
+          serviceAccountEmail: 'my-service-account@my-project.iam.gserviceaccount.com',
           httpsTrigger: {
             url: 'foo',
           },
@@ -252,10 +295,10 @@ describe('CompileFunctions', () => {
       };
 
       const compiledResources = [{
-        type: 'cloudfunctions.v1beta2.function',
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
         name: 'my-service-dev-func1',
         properties: {
-          location: 'us-central1',
+          parent: 'projects/my-project/locations/us-central1',
           runtime: 'nodejs8',
           function: 'func1',
           availableMemoryMb: 256,
@@ -291,10 +334,10 @@ describe('CompileFunctions', () => {
       };
 
       const compiledResources = [{
-        type: 'cloudfunctions.v1beta2.function',
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
         name: 'my-service-dev-func1',
         properties: {
-          location: 'us-central1',
+          parent: 'projects/my-project/locations/us-central1',
           runtime: 'nodejs8',
           function: 'func1',
           availableMemoryMb: 256,
@@ -334,10 +377,10 @@ describe('CompileFunctions', () => {
       };
 
       const compiledResources = [{
-        type: 'cloudfunctions.v1beta2.function',
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
         name: 'my-service-dev-func1',
         properties: {
-          location: 'us-central1',
+          parent: 'projects/my-project/locations/us-central1',
           runtime: 'nodejs8',
           function: 'func1',
           availableMemoryMb: 256,
@@ -360,6 +403,140 @@ describe('CompileFunctions', () => {
       });
     });
 
+    it('should set the service account based on the functions configuration', () => {
+      googlePackage.serverless.service.functions = {
+        func1: {
+          handler: 'func1',
+          serviceAccount: 'func1@my-project.iam.gserviceaccount.com',
+          events: [
+            { http: 'foo' },
+          ],
+        },
+      };
+
+      const compiledResources = [{
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
+        name: 'my-service-dev-func1',
+        properties: {
+          parent: 'projects/my-project/locations/us-central1',
+          runtime: 'nodejs8',
+          function: 'func1',
+          availableMemoryMb: 256,
+          timeout: '60s',
+          sourceArchiveUrl: 'gs://sls-my-service-dev-12345678/some-path/artifact.zip',
+          serviceAccountEmail: 'func1@my-project.iam.gserviceaccount.com',
+          httpsTrigger: {
+            url: 'foo',
+          },
+          labels: {},
+        },
+      }];
+
+      return googlePackage.compileFunctions().then(() => {
+        expect(consoleLogStub.calledOnce).toEqual(true);
+        expect(googlePackage.serverless.service.provider.compiledConfigurationTemplate.resources)
+          .toEqual(compiledResources);
+      });
+    });
+
+    it('should set the service account based on the provider configuration', () => {
+      googlePackage.serverless.service.functions = {
+        func1: {
+          handler: 'func1',
+          events: [
+            { http: 'foo' },
+          ],
+        },
+      };
+      googlePackage.serverless.service.provider.serviceAccount = 'provider@my-project.iam.gserviceaccount.com';
+
+      const compiledResources = [{
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
+        name: 'my-service-dev-func1',
+        properties: {
+          parent: 'projects/my-project/locations/us-central1',
+          runtime: 'nodejs8',
+          function: 'func1',
+          availableMemoryMb: 256,
+          timeout: '60s',
+          sourceArchiveUrl: 'gs://sls-my-service-dev-12345678/some-path/artifact.zip',
+          serviceAccountEmail: 'provider@my-project.iam.gserviceaccount.com',
+          httpsTrigger: {
+            url: 'foo',
+          },
+          labels: {},
+        },
+      }];
+
+      return googlePackage.compileFunctions().then(() => {
+        expect(consoleLogStub.calledOnce).toEqual(true);
+        expect(googlePackage.serverless.service.provider.compiledConfigurationTemplate.resources)
+          .toEqual(compiledResources);
+      });
+    });
+
+    it('should set the service account based on the merged provider and function configuration', () => {
+      googlePackage.serverless.service.functions = {
+        func1: {
+          handler: 'func1',
+          events: [
+            { http: 'foo' },
+          ],
+          serviceAccount: 'func1@my-project.iam.gserviceaccount.com',
+        },
+
+        func2: {
+          handler: 'func2',
+          events: [
+            { http: 'foo' },
+          ],
+        },
+
+      };
+      googlePackage.serverless.service.provider.serviceAccount = 'provider@my-project.iam.gserviceaccount.com';
+
+      const compiledResources = [{
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
+        name: 'my-service-dev-func1',
+        properties: {
+          parent: 'projects/my-project/locations/us-central1',
+          runtime: 'nodejs8',
+          function: 'func1',
+          availableMemoryMb: 256,
+          timeout: '60s',
+          sourceArchiveUrl: 'gs://sls-my-service-dev-12345678/some-path/artifact.zip',
+          serviceAccountEmail: 'func1@my-project.iam.gserviceaccount.com',
+          httpsTrigger: {
+            url: 'foo',
+          },
+          labels: {},
+        },
+      },
+      {
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
+        name: 'my-service-dev-func2',
+        properties: {
+          parent: 'projects/my-project/locations/us-central1',
+          runtime: 'nodejs8',
+          function: 'func2',
+          availableMemoryMb: 256,
+          timeout: '60s',
+          sourceArchiveUrl: 'gs://sls-my-service-dev-12345678/some-path/artifact.zip',
+          serviceAccountEmail: 'provider@my-project.iam.gserviceaccount.com',
+          httpsTrigger: {
+            url: 'foo',
+          },
+          labels: {},
+        },
+      }];
+
+      return googlePackage.compileFunctions().then(() => {
+        expect(consoleLogStub.calledTwice).toEqual(true);
+        expect(googlePackage.serverless.service.provider.compiledConfigurationTemplate.resources)
+          .toEqual(compiledResources);
+      });
+    });
+
     it('should set the environment variables based on the function configuration', () => {
       googlePackage.serverless.service.functions = {
         func1: {
@@ -374,10 +551,10 @@ describe('CompileFunctions', () => {
       };
 
       const compiledResources = [{
-        type: 'cloudfunctions.v1beta2.function',
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
         name: 'my-service-dev-func1',
         properties: {
-          location: 'us-central1',
+          parent: 'projects/my-project/locations/us-central1',
           runtime: 'nodejs8',
           function: 'func1',
           availableMemoryMb: 256,
@@ -414,10 +591,10 @@ describe('CompileFunctions', () => {
       };
 
       const compiledResources = [{
-        type: 'cloudfunctions.v1beta2.function',
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
         name: 'my-service-dev-func1',
         properties: {
-          location: 'us-central1',
+          parent: 'projects/my-project/locations/us-central1',
           runtime: 'nodejs8',
           function: 'func1',
           availableMemoryMb: 256,
@@ -451,10 +628,10 @@ describe('CompileFunctions', () => {
       };
 
       const compiledResources = [{
-        type: 'cloudfunctions.v1beta2.function',
+        type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
         name: 'my-service-dev-func1',
         properties: {
-          location: 'us-central1',
+          parent: 'projects/my-project/locations/us-central1',
           runtime: 'nodejs8',
           function: 'func1',
           availableMemoryMb: 256,
@@ -503,10 +680,10 @@ describe('CompileFunctions', () => {
 
       const compiledResources = [
         {
-          type: 'cloudfunctions.v1beta2.function',
+          type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
           name: 'my-service-dev-func1',
           properties: {
-            location: 'us-central1',
+            parent: 'projects/my-project/locations/us-central1',
             runtime: 'nodejs8',
             function: 'func1',
             availableMemoryMb: 256,
@@ -521,10 +698,10 @@ describe('CompileFunctions', () => {
           },
         },
         {
-          type: 'cloudfunctions.v1beta2.function',
+          type: 'gcp-types/cloudfunctions-v1:projects.locations.functions',
           name: 'my-service-dev-func2',
           properties: {
-            location: 'us-central1',
+            parent: 'projects/my-project/locations/us-central1',
             runtime: 'nodejs8',
             function: 'func2',
             availableMemoryMb: 256,
